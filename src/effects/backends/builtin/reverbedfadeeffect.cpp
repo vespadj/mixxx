@@ -30,7 +30,7 @@ EffectManifestPointer ReverbedFadeEffect::getManifest() {
             "Lower decay values cause reverberations to fade out more quickly."));
     decay->setValueScaler(EffectManifestParameter::ValueScaler::Linear);
     decay->setUnitsHint(EffectManifestParameter::UnitsHint::Unknown);
-    decay->setRange(0, 0.5, 1);
+    decay->setRange(0, 0.75, 1);
 
     EffectManifestParameterPointer bandwidth = pManifest->addParameter();
     bandwidth->setId("bandwidth");
@@ -64,7 +64,7 @@ EffectManifestPointer ReverbedFadeEffect::getManifest() {
     send->setUnitsHint(EffectManifestParameter::UnitsHint::Unknown);
     // send->setDefaultLinkType(EffectManifestParameter::LinkType::Linked);
     // send->setDefaultLinkInversion(EffectManifestParameter::LinkInversion::NotInverted);
-    send->setRange(0, 0, 1);
+    send->setRange(0, 1, 1);
 
     EffectManifestParameterPointer main = pManifest->addParameter();
     main->setId("main");
@@ -90,6 +90,30 @@ void ReverbedFadeEffect::loadEngineEffectParameters(
     m_pMainParameter = parameters.value("main");
 }
 
+double ReverbedFadeEffect::f_in(double x) {
+    // Calculate input coefficient based on main
+    if (x < 0.7) {
+        return 1;
+    } else if (x < 0.9) {
+        return 1 - ((x - 0.7) / 0.2);
+    } else {
+        return 0;
+    }
+}
+
+double ReverbedFadeEffect::f_wet(double x) {
+    // Calculate wet coefficient based on main
+    if (x <= 0) {
+        return 0;
+    } else if (x < 0.2) {
+        return x * 3;
+    } else if (x >= 0.2 && x < 0.7) {
+        return x * 0.8 + 0.44;
+    } else {
+        return 1;
+    }
+}
+
 void ReverbedFadeEffect::processChannel(
         ReverbedFadeGroupState* pState,
         const CSAMPLE* pInput,
@@ -99,10 +123,22 @@ void ReverbedFadeEffect::processChannel(
         const GroupFeatureState& groupFeatures) {
     Q_UNUSED(groupFeatures);
 
+    double main = m_pMainParameter->value();
+    CSAMPLE_GAIN in_coeff = static_cast<CSAMPLE_GAIN>(f_in(main));
+    double wet_coeff = f_wet(main);
+
     const auto decay = static_cast<sample_t>(m_pDecayParameter->value());
     const auto bandwidth = static_cast<sample_t>(m_pBandWidthParameter->value());
     const auto damping = static_cast<sample_t>(m_pDampingParameter->value());
-    const auto sendCurrent = static_cast<sample_t>(m_pSendParameter->value());
+    const auto sendCurrent = static_cast<sample_t>(m_pSendParameter->value() * wet_coeff);
+
+    const auto samplesPerBuffer = engineParameters.samplesPerBuffer();
+
+    // SampleUtil::addWithRampingGain(pOutput, pInput, 1.0, in_coeff, samplesPerBuffer); // always mute
+
+    // Apply in_coeff to input signal
+    SampleUtil::copyWithGain(pInputgained, pInput, in_coeff, samplesPerBuffer);
+    
 
     // Reinitialize the effect when turning it on to prevent replaying the old buffer
     // from the last time the effect was enabled.
@@ -113,7 +149,7 @@ void ReverbedFadeEffect::processChannel(
         pState->sampleRate = engineParameters.sampleRate();
     }
 
-    pState->reverb.processBuffer(pInput,
+    pState->reverb.processBuffer(pInputgained,
             pOutput,
             engineParameters.samplesPerBuffer(),
             bandwidth,

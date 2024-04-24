@@ -49,6 +49,10 @@ class ReverbedFadeEffect : public EffectProcessorImpl<ReverbedFadeGroupState> {
             const EffectEnableState enableState,
             const GroupFeatureState& groupFeatures) override;
 
+    double f_in(double main);
+    double f_wet(double main);
+    CSAMPLE* pInputgained;
+
   private:
     QString debugString() const {
         return getId();
