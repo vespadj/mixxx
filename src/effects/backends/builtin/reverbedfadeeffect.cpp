@@ -91,7 +91,7 @@ void ReverbedFadeEffect::loadEngineEffectParameters(
 }
 
 void ReverbedFadeEffect::processChannel(
-        ReverbGroupState* pState,
+        ReverbedFadeGroupState* pState,
         const CSAMPLE* pInput,
         CSAMPLE* pOutput,
         const mixxx::EngineParameters& engineParameters,

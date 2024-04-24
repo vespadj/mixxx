@@ -16,6 +16,7 @@
 #include "effects/builtin/moogladder4filtereffect.h"
 #include "effects/builtin/phasereffect.h"
 #include "effects/builtin/reverbeffect.h"
+#include "effects/builtin/reverbedfadeeffect.h"
 #include "engine/channelhandle.h"
 #include "engine/effects/groupfeaturestate.h"
 #include "test/baseeffecttest.h"
@@ -91,6 +92,7 @@ DECLARE_EFFECT_BENCHMARK(LinkwitzRiley8EQEffect)
 DECLARE_EFFECT_BENCHMARK(MoogLadder4FilterEffect)
 DECLARE_EFFECT_BENCHMARK(PhaserEffect)
 DECLARE_EFFECT_BENCHMARK(ReverbEffect)
+DECLARE_EFFECT_BENCHMARK(ReverbedFadeEffect)
 
 }  // namespace
 #endif

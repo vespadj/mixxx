@@ -15,6 +15,7 @@
 #include "effects/backends/builtin/threebandbiquadeqeffect.h"
 #ifndef __MACAPPSTORE__
 #include "effects/backends/builtin/reverbeffect.h"
+#include "effects/backends/builtin/reverbedfadeeffect.h"
 #endif
 #include "effects/backends/builtin/autopaneffect.h"
 #include "effects/backends/builtin/distortioneffect.h"
@@ -53,6 +54,7 @@ BuiltInBackend::BuiltInBackend() {
     registerEffect<AutoPanEffect>();
 #ifndef __MACAPPSTORE__
     registerEffect<ReverbEffect>();
+    registerEffect<ReverbedFadeEffect>();
 #endif
     registerEffect<PhaserEffect>();
     registerEffect<MetronomeEffect>();
