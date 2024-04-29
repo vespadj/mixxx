@@ -51,6 +51,8 @@ class ReverbedFadeEffect : public EffectProcessorImpl<ReverbedFadeGroupState> {
 
     double f_in(double main);
     double f_wet(double main);
+
+    CSAMPLE inputgained;
     CSAMPLE* pInputgained;
 
   private:

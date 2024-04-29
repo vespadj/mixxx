@@ -134,11 +134,14 @@ void ReverbedFadeEffect::processChannel(
 
     const auto samplesPerBuffer = engineParameters.samplesPerBuffer();
 
-    // SampleUtil::addWithRampingGain(pOutput, pInput, 1.0, in_coeff, samplesPerBuffer); // always mute
-
     // Apply in_coeff to input signal
-    SampleUtil::copyWithGain(pInputgained, pInput, in_coeff, samplesPerBuffer);
     
+    // NO: // always mute
+    // SampleUtil::addWithRampingGain(pOutput, pInput, 1.0, in_coeff, samplesPerBuffer);
+
+    CSAMPLE* pInputgained = SampleUtil::alloc(samplesPerBuffer);
+    SampleUtil::fill(pInputgained, 0.0f, samplesPerBuffer);
+    SampleUtil::copyWithGain(pInputgained, pInput, in_coeff, samplesPerBuffer);
 
     // Reinitialize the effect when turning it on to prevent replaying the old buffer
     // from the last time the effect was enabled.
