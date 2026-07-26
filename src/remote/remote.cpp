@@ -1,33 +1,35 @@
-#include <memory>
-#include <vector>
+#include "remote.h"
 
 #include <QDir>
 #include <QFileInfo>
 #include <QHttpServer>
 #include <QHttpServerResponse>
 #include <QJsonArray>
-#include <QJsonValue>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QTcpServer>
+#include <QJsonValue>
 #include <QSqlResult>
-
-#include "remote.h"
+#include <QTcpServer>
+#include <memory>
+#include <vector>
 
 #include "control/controlobject.h"
-#include "util/db/dbconnectionpooled.h"
-
+#include "library/autodj/autodjfeature.h"
+#include "library/autodj/autodjprocessor.h"
 #include "library/library.h"
-#include "library/trackcollection.h"
-#include "library/trackcollectioniterator.h"
 #include "library/searchquery.h"
 #include "library/searchqueryparser.h"
-#include "library/autodj/autodjprocessor.h"
-#include "library/autodj/autodjfeature.h"
+#include "library/trackcollection.h"
+#include "library/trackcollectioniterator.h"
 #include "mixer/basetrackplayer.h"
+#include "track/keyutils.h"
+#include "util/db/dbconnectionpooled.h"
+
+/* unused:
 #include "track/track.h"
 #include "track/trackiterator.h"
 #include "library/playlisttablemodel.h"
+*/
 
 const mixxx::Logger kLogger("RemoteControl");
 
@@ -118,11 +120,15 @@ namespace mixxx {
                         QSqlDatabase dbase=DbConnectionPooled(db);
 
                         TextFilterNode search(dbase,
-                                                            QStringList({"title","artist","album"}),
-                                                            cur["searchtrack"].toString());
+                                QStringList({"title", "artist", "album"}),
+                                cur["searchtrack"].toString());
 
-
-                        QSqlQuery query(QString("SELECT id,artist,title FROM library WHERE ")+search.toSql(),dbase);
+                        QSqlQuery query(QString("SELECT "
+                                                "id,artist,title,duration,bpm,"
+                                                "timesplayed,key_id FROM "
+                                                "library WHERE ") +
+                                        search.toSql(),
+                                dbase);
 
                         QJsonArray tracklist;
 
@@ -132,6 +138,14 @@ namespace mixxx {
                                 jtrack.insert("id",query.value("id").toString());
                                 jtrack.insert("artist",query.value("artist").toString());
                                 jtrack.insert("title",query.value("title").toString());
+                                jtrack.insert("duration", query.value("duration").toDouble());
+                                jtrack.insert("bpm", query.value("bpm").toDouble());
+                                jtrack.insert("timesplayed", query.value("timesplayed").toInt());
+                                // Translate key_id to human-readable key text
+                                auto chromaticKey = static_cast<
+                                        mixxx::track::io::key::ChromaticKey>(
+                                        query.value("key_id").toInt());
+                                jtrack.insert("key", KeyUtils::keyToString(chromaticKey));
                                 tracklist.push_back(jtrack);
                             }while(query.next());
                             QJsonObject trackobj;
@@ -213,6 +227,11 @@ namespace mixxx {
                                 jtrack.insert("position",query.value("position").toInt());
                                 jtrack.insert("artist",tptrack->getArtist());
                                 jtrack.insert("title",tptrack->getTitle());
+                                jtrack.insert("duration", tptrack->getDuration());
+                                jtrack.insert("bpm", tptrack->getBpm());
+                                jtrack.insert("timesplayed", tptrack->getTimesPlayed());
+                                // Translate key to human-readable key text
+                                jtrack.insert("key", KeyUtils::keyToString(tptrack->getKey()));
                                 tracklist.push_back(jtrack);
                             }
 
@@ -287,15 +306,26 @@ namespace mixxx {
                             double position=ControlObject::get(ConfigKey(group, "playposition"));
                             BaseTrackPlayer* pPlayer=ainf->getPlayer(group);
                             TrackPointer pTrack=pPlayer ? pPlayer->getLoadedTrack() : nullptr;
+                            // When no track is loaded, force position to 0 (default is 0.5)
+                            if (duration <= 0.0) {
+                                position = 0.0;
+                            }
                             QJsonObject deckobj;
                             deckobj.insert("deck",deck);
                             deckobj.insert("playing",
                                     ControlObject::get(ConfigKey(group, "play")) > 0.0);
                             deckobj.insert("position",position);
                             deckobj.insert("duration",duration);
-                            deckobj.insert("elapsed",position*duration);
+                            deckobj.insert("elapsed", pTrack ? position * duration : 0.0);
                             deckobj.insert("artist",pTrack ? pTrack->getArtist() : QString());
                             deckobj.insert("title",pTrack ? pTrack->getTitle() : QString());
+                            deckobj.insert("bpm",
+                                    pTrack ? pTrack->getBpm()
+                                           : QJsonValue(QJsonValue::Null));
+                            deckobj.insert("key",
+                                    pTrack ? KeyUtils::keyToString(
+                                                     pTrack->getKey())
+                                           : QString());
                             resproot.push_back(deckobj);
                         }
                     }
@@ -354,6 +384,31 @@ namespace mixxx {
 #endif
                                         jdeck["play"].toBool());
                             }
+                        }
+                    }
+
+                    if (!cur["setParameter"].isNull()) {
+                        QJsonObject jparam = cur["setParameter"].toObject();
+                        if (!jparam["group"].isNull() &&
+                                !jparam["key"].isNull() &&
+                                !jparam["value"].isNull()) {
+                            ControlObject::set(
+                                    ConfigKey(jparam["group"].toString(),
+                                            jparam["key"].toString()),
+                                    jparam["value"].toDouble());
+                        }
+                    }
+
+                    if (!cur["getParameter"].isNull()) {
+                        QJsonObject jparam = cur["getParameter"].toObject();
+                        if (!jparam["group"].isNull() && !jparam["key"].isNull()) {
+                            QJsonObject result;
+                            result["group"] = jparam["group"].toString();
+                            result["key"] = jparam["key"].toString();
+                            result["value"] = ControlObject::get(
+                                    ConfigKey(jparam["group"].toString(),
+                                            jparam["key"].toString()));
+                            resproot.push_back(result);
                         }
                     }
                 }
@@ -454,4 +509,3 @@ void mixxx::RemoteControl::reload(){
                 m_pConfig,m_trackscollmngr,m_library,m_ainf,m_database);
     }
 }
-

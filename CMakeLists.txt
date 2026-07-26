@@ -1573,7 +1573,7 @@ add_library(
   src/preferences/replaygainsettings.cpp
   src/preferences/settingsmanager.cpp
   src/preferences/upgrade.cpp
-  src/recording/recordingmanager.cpp 
+  src/recording/recordingmanager.cpp
   src/skin/legacy/colorschemeparser.cpp
   src/skin/legacy/imgcolor.cpp
   src/skin/legacy/imginvert.cpp
@@ -2368,16 +2368,53 @@ if(QT6)
   if(NOT Qt6_FOUND)
     fatal_error_missing_env()
   endif()
-  
+
   if(HTTP_REMOTE)
+    # Qt6HttpServer is an external module not part of core Qt6.
+    # Its CMake files may not be announced by Qt6Config and may reside in
+    # paths not searched by find_package.
+    # Derive its location from Qt6_DIR, which is set by find_package above
+    # and works on all distributions (Debian, Arch, Fedora, macOS, etc.).
+    if(NOT Qt6HttpServer_DIR AND DEFINED Qt6_DIR)
+      get_filename_component(_qt6_cmake_parent "${Qt6_DIR}" DIRECTORY)
+
+      foreach(
+        _try_path
+        "${_qt6_cmake_parent}/Qt6HttpServer"
+        "${_qt6_cmake_parent}/${CMAKE_BUILD_TYPE}/Qt6HttpServer"
+      )
+        if(EXISTS "${_try_path}/Qt6HttpServerConfig.cmake")
+          set(
+            Qt6HttpServer_DIR
+            "${_try_path}"
+            CACHE PATH
+            "Path to Qt6HttpServer config"
+          )
+          message(STATUS "Found Qt6HttpServer in: ${Qt6HttpServer_DIR}")
+          break()
+        endif()
+      endforeach()
+
+      if(NOT Qt6HttpServer_DIR)
+        message(
+          WARNING
+          "Qt6HttpServer not found near Qt6_DIR (${Qt6_DIR}). "
+          "Install it (e.g. apt install qt6-httpserver-dev) or set "
+          "Qt6HttpServer_DIR manually."
+        )
+      endif()
+    endif()
+
     find_package(Qt6 COMPONENTS HttpServer REQUIRED)
 
     add_compile_definitions(HTTP_REMOTE=true)
 
-    target_sources(mixxx-lib PRIVATE
-      src/preferences/dialog/dlgprefremotecontrol.cpp
-      src/preferences/dialog/dlgprefremotecontrol.ui
-      src/remote/remote.cpp
+    target_sources(
+      mixxx-lib
+      PRIVATE
+        src/preferences/dialog/dlgprefremotecontrol.cpp
+        src/preferences/dialog/dlgprefremotecontrol.ui
+        src/remote/remote.cpp
     )
     target_link_libraries(mixxx-lib PRIVATE Qt6::HttpServer)
   endif()
