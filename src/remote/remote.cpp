@@ -330,6 +330,45 @@ namespace mixxx {
                         }
                     }
 
+                    if (!cur["getDecksStatuses"].isNull()) {
+                        QJsonArray jdecks = cur["getDecksStatuses"].toArray();
+                        for (const QJsonValue& v : jdecks) {
+                            int deck = v.toInt();
+                            if (deck <= 0)
+                                continue;
+                            QString group = PlayerManager::groupForDeck(deck - 1);
+                            double trackSamples = ControlObject::get(
+                                    ConfigKey(group, "track_samples"));
+                            double trackSampleRate = ControlObject::get(
+                                    ConfigKey(group, "track_samplerate"));
+                            double duration = (trackSampleRate > 0.0)
+                                    ? trackSamples / (trackSampleRate * 2.0)
+                                    : 0.0;
+                            double position = ControlObject::get(ConfigKey(group, "playposition"));
+                            BaseTrackPlayer* pPlayer = ainf->getPlayer(group);
+                            TrackPointer pTrack = pPlayer ? pPlayer->getLoadedTrack() : nullptr;
+                            if (duration <= 0.0) {
+                                position = 0.0;
+                            }
+                            QJsonObject deckobj;
+                            deckobj.insert("deck", deck);
+                            deckobj.insert("playing",
+                                    ControlObject::get(ConfigKey(group, "play")) > 0.0);
+                            deckobj.insert("position", position);
+                            deckobj.insert("duration", duration);
+                            deckobj.insert("elapsed", pTrack ? position * duration : 0.0);
+                            deckobj.insert("artist", pTrack ? pTrack->getArtist() : QString());
+                            deckobj.insert("title", pTrack ? pTrack->getTitle() : QString());
+                            deckobj.insert("bpm",
+                                    pTrack ? pTrack->getBpm()
+                                           : QJsonValue(QJsonValue::Null));
+                            deckobj.insert("key",
+                                    pTrack ? KeyUtils::keyToString(pTrack->getKey())
+                                           : QString());
+                            resproot.push_back(deckobj);
+                        }
+                    }
+
                     if(!cur["setdeckplay"].isNull()){
                         QJsonObject jdeck=cur["setdeckplay"].toObject();
                         int deck=jdeck["deck"].toInt();
@@ -410,6 +449,26 @@ namespace mixxx {
                                             jparam["key"].toString()));
                             resproot.push_back(result);
                         }
+                    }
+
+                    if (!cur["getParameters"].isNull()) {
+                        QJsonArray jparams = cur["getParameters"].toArray();
+                        QJsonArray results;
+                        for (const QJsonValue& v : jparams) {
+                            QJsonObject jp = v.toObject();
+                            if (!jp["group"].isNull() && !jp["key"].isNull()) {
+                                QJsonObject result;
+                                result["group"] = jp["group"].toString();
+                                result["key"] = jp["key"].toString();
+                                result["value"] = ControlObject::get(
+                                        ConfigKey(jp["group"].toString(),
+                                                jp["key"].toString()));
+                                results.push_back(result);
+                            }
+                        }
+                        QJsonObject wrapper;
+                        wrapper["parameters"] = results;
+                        resproot.push_back(wrapper);
                     }
                 }
 
