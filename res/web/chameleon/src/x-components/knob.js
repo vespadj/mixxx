@@ -6,7 +6,9 @@ import template from "./knob.html?raw";
  * @param {number} config.min - Minimum value (default: 0)
  * @param {number} config.max - Maximum value (default: 100)
  * @param {number} config.step - Increment step (default: 0.5)
- * @param {number} config.value - Initial value (default: min)
+ * @param {object} config.group - Group object reference (REPLACES value)
+ * @param {string} config.prop - Property name on group (REPLACES value)
+ * @param {number} config.value - Initial value (fallback if group/prop not provided)
  * @param {number} config.default - Value to reset to on double-click (default: 50)
  * @param {string} config.color - Primary color (default: '#6d4aff')
  * @param {number} config.size - Size in pixels (default: 100)
@@ -21,6 +23,8 @@ export default (config = {}) => ({
     min: config.min ?? 0,
     max: config.max ?? 100,
     step: config.step ?? 0.5,
+    group: config.group ?? null,
+    prop: config.prop ?? null,
     value: config.value ?? (config.min ?? 0),
     defaultVal: config.default ?? 50,
     color: config.color ?? "#6d4aff",
@@ -47,6 +51,16 @@ export default (config = {}) => ({
 
     init() {
         this.$nextTick(() => { this.$el.innerHTML = template; });
+        
+        // if value is changed from Mixxx (dragging is false), then update
+        if (this.group && this.prop) {
+            this.$watch(() => this.group[this.prop], (val) => {
+                if (!this.dragging && val !== this.value) {
+                    this.value = val;
+                    this.updateAngleFromValue();
+                }
+            });
+        }
 
         this.onMouseMoveBound = (e) => this.handleMove(e);
         this.onTouchMoveBound = (e) => this.handleMove(e);

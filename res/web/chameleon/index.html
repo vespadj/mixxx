@@ -351,37 +351,36 @@
                   </div>
                   <div class="flex justify-center">
                     <div
-                    :id="'ch' + deck.id + '_gain'"
-                    x-data="knob({name: 'GAIN', value: Mixer.Channels[deck.id].gain, size: 48})"
-                    x-init="$watch('value', newVal => knobChange('gain', deck.id, newVal))"
-                    ></div>
+                      :id="'ch' + deck.id + '_gain'"
+                      x-data="knob({name: 'GAIN', group: Mixer.Channels[deck.id], prop: 'gain', size: 48})"
+                      x-init="$watch('value', newVal => knobChange('gain', deck.id, newVal))"                    ></div>
                   </div>
                 </div>
 
               <div
                 :id="'ch' + deck.id + '_high'"
-                x-data="knob({name: 'HI', value: Mixer.Channels[deck.id].high, size: 48})"
+                x-data="knob({name: 'HI', group: Mixer.Channels[deck.id], prop: 'high', size: 48})"
                 x-init="$watch('value', newVal => knobChange('high', deck.id, newVal))"
               ></div>
               <div
                 :id="'ch' + deck.id + '_mid'"
-                x-data="knob({name: 'MI', value: Mixer.Channels[deck.id].mid, size: 48})"
+                x-data="knob({name: 'MI', group: Mixer.Channels[deck.id], prop: 'mid', size: 48})"
                 x-init="$watch('value', newVal => knobChange('mid', deck.id, newVal))"
               ></div>
               <div
                 :id="'ch' + deck.id + '_bass'"
-                x-data="knob({name: 'BA', value: Mixer.Channels[deck.id].bass, size: 48})"
+                x-data="knob({name: 'BA', group: Mixer.Channels[deck.id], prop: 'bass', size: 48})"
                 x-init="$watch('value', newVal => knobChange('bass', deck.id, newVal))"
               ></div>
               <div class="flex flex-col justify-center items-center pt-2 w-full bg-base-200">
                 <div
                   :id="'ch' + deck.id + '_super_fx'"
-                  x-data="knob({name: 'FX', value: Mixer.Channels[deck.id].super_fx, size: 48})"
+                  x-data="knob({name: 'FX', group: Mixer.Channels[deck.id], prop: 'super_fx', size: 48})"
                   x-init="$watch('value', newVal => knobChange('super_fx', deck.id, newVal))"
                 ></div>
                 <div
                   :id="'ch' + deck.id + '_volume'"
-                  x-data="knob({name: 'VOL', value: Mixer.Channels[deck.id].volume, size: 48, default: 100})"
+                  x-data="knob({name: 'VOL', group: Mixer.Channels[deck.id], prop: 'volume', size: 48, default: 100})"
                   x-init="$watch('value', newVal => knobChange('volume', deck.id, newVal))"
                 ></div>
               </div>
