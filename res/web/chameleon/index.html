@@ -139,6 +139,23 @@
               <li>
                 <fieldset class="block w-full fieldset">
                   <legend class="fieldset-legend">
+                    Mixer refresh (s)
+                  </legend>
+                  <input
+                    type="number"
+                    class="w-full input input-sm input-bordered"
+                    x-model="settings.mixerPollInterval"
+                    min="1"
+                    max="4"
+                  />
+                  <p class="w-full text-xs opacity-60">
+                    How often to refresh mixer knob values (seconds).
+                  </p>
+                </fieldset>
+              </li>
+              <li>
+                <fieldset class="block w-full fieldset">
+                  <legend class="fieldset-legend">
                     Theme
                   </legend>
                   <!-- # Theme switcher -->

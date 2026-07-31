@@ -25,7 +25,7 @@ export default (config = {}) => ({
     step: config.step ?? 0.5,
     group: config.group ?? null,
     prop: config.prop ?? null,
-    value: config.value ?? (config.min ?? 0),
+    value: config.value ?? config.default ?? 50,
     defaultVal: config.default ?? 50,
     color: config.color ?? "#6d4aff",
     size: config.size ?? 100,

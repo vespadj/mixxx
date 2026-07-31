@@ -44,6 +44,9 @@ export default () => ({
         /** AutoDJ polling interval in seconds (default 10) */
         autodjPollInterval: Alpine.$persist(10).as("settings_autodj_poll_interval"),
 
+        /** Mixer knob polling interval in seconds (default 2) */
+        mixerPollInterval: Alpine.$persist(2).as("settings_mixer_poll_interval"),
+
         toggleDeckVisible(id) {
             this.decks = this.decks.map((deck) =>
                 deck.id === id ? {...deck, visible: !deck.visible} : deck,
@@ -234,10 +237,11 @@ export default () => ({
             }
         }, adjInterval);
 
-        // Start mixer knob polling (batch call every 2s, only when mixer tab is visible)
+        // Start mixer knob polling (batch call, only when mixer tab is visible)
+        const mixerInterval = (this.settings.mixerPollInterval || 2) * 1000;
         this._mixerPollTimer = setInterval(() => {
             this.getMixerParameters();
-        }, 2000);
+        }, mixerInterval);
     },
 
     /**
