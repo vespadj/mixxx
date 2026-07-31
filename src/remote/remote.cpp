@@ -23,10 +23,10 @@
 #include "library/trackcollectioniterator.h"
 #include "mixer/basetrackplayer.h"
 #include "track/keyutils.h"
+#include "track/track.h" // IWYU pragma: keep
 #include "util/db/dbconnectionpooled.h"
 
 /* unused:
-#include "track/track.h"
 #include "track/trackiterator.h"
 #include "library/playlisttablemodel.h"
 */
@@ -334,8 +334,9 @@ namespace mixxx {
                         QJsonArray jdecks = cur["getDecksStatuses"].toArray();
                         for (const QJsonValue& v : jdecks) {
                             int deck = v.toInt();
-                            if (deck <= 0)
+                            if (deck <= 0) {
                                 continue;
+                            }
                             QString group = PlayerManager::groupForDeck(deck - 1);
                             double trackSamples = ControlObject::get(
                                     ConfigKey(group, "track_samples"));
@@ -531,7 +532,7 @@ namespace mixxx {
     	QTcpServer*  	      tcpserver;
         QHttpServer           httpServer;
     };
-};
+    }; // namespace mixxx
 
 mixxx::RemoteControl::RemoteControl(
                                         UserSettingsPointer pConfig,
