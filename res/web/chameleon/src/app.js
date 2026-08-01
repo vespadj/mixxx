@@ -176,6 +176,39 @@ export default () => ({
         this.$watch("Mixer.main", async(val) => {
             await this.setParam("[Master]", "gain", parseFloat(val));
         });
+
+        // Global mouseup listener: handles two Pioneer CDJ scenarios:
+        // 1. Drag from CUE to PLAY: detect if mouse is released over a PLAY
+        //    button (using its bounding rect, so the gap between buttons is
+        //    tolerated) and call deckPlayUp() to start playback + release CUE.
+        // 2. Drag from CUE into void: release CUE if still pressed.
+        document.addEventListener("mouseup", (e) => {
+            // Check if mouse is released inside any PLAY button's bounding rect
+            // (works even when the release happens on the gap between buttons)
+            const playButtons = document.querySelectorAll("[data-play-button]");
+            for (const btn of playButtons) {
+                const rect = btn.getBoundingClientRect();
+                if (e.clientX >= rect.left && e.clientX <= rect.right &&
+                        e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                    this.deckPlayUp(btn.dataset.deckId);
+                    return; // deckPlayUp handles CUE release
+                }
+            }
+            // Otherwise, release any pressed CUE (drag into void)
+            for (const deckId of Object.keys(this.Decks)) {
+                const deck = this.Decks[deckId];
+                if (deck && deck.cuePressed) {
+                    const group = `[Channel${deckId}]`;
+                    if (deck.pos > 0.97) {
+                        this.setParam(group, "cue_goto", 0);
+                    } else {
+                        // skipped on PLAY
+                        this.setParam(group, "cue_default", 0);
+                    }
+                    deck.cuePressed = false;
+                }
+            }
+        });
     },
 
     /**
@@ -245,10 +278,18 @@ export default () => ({
     },
 
     /**
+     * Extra deck parameters to request from the backend via getDecksStatuses.
+     * These are read dynamically via ControlObject::get in the C++ backend,
+     * so new params can be added here without recompiling.
+     */
+    deckExtraParams: ["sync_enabled", "sync_leader", "rate", "pitch"],
+
+    /**
      * Fetch status for all visible decks in a single batch call.
      * Only runs when the page is focused and the active tab needs deck info.
+     * @param {string[]} [extraParams] - extra ControlObject keys to request
      */
-    async getDecksStatuses() {
+    async getDecksStatuses(extraParams) {
         if (document.hidden) { return; }
         if (this.deckSeeking) { return; }
         if (this.activeTab !== "mixer" && this.activeTab !== "autodj") { return; }
@@ -256,8 +297,12 @@ export default () => ({
         const visibleDeckIds = this.settings.visibleDecks.map(d => d.id);
         if (visibleDeckIds.length === 0) { return; }
 
+        const extra = extraParams || this.deckExtraParams;
+
         try {
-            const res = await rcontrol({[CMD.GET_DECKS_STATUSES]: visibleDeckIds});
+            const res = await rcontrol({
+                [CMD.GET_DECKS_STATUSES]: {decks: visibleDeckIds, extra: extra},
+            });
             for (const item of res) {
                 if (item.deck === undefined) { continue; }
                 const deck = item.deck;
@@ -276,6 +321,24 @@ export default () => ({
                 if (item.artist !== undefined) { d.artist = item.artist || ""; }
                 if (item.key !== undefined) { d.key = item.key || "–"; }
                 if (item.bpm !== undefined) { d.bpm = item.bpm; }
+                // Map backend ControlObject names to Deck model property names
+                const extraParamMap = {
+                    "sync_enabled": "sync",
+                    "sync_leader": "syncLeader",
+                    "rate": "rate",
+                    "pitch": "pitch",
+                };
+                // Params that should be converted from number to boolean
+                const boolParams = new Set(["sync_enabled", "sync_leader"]);
+
+                for (const param of extra) {
+                    const modelProp = extraParamMap[param] || param;
+                    if (item[param] !== undefined && modelProp in d) {
+                        d[modelProp] = boolParams.has(param)
+                            ? item[param] > 0
+                            : item[param];
+                    }
+                }
             }
         } catch (err) {
             console.error("getDecksStatuses error:", err);
@@ -377,10 +440,35 @@ export default () => ({
         await decksApi.setDeckPosition(this.selectedDeck, sliderValue / 1000);
     },
 
-    async toggleDeckPlay(deckId) {
+    /**
+     * Play/Pause toggle — triggered on press (mousedown/touchstart), Pioneer CDJ style.
+     * @param deckId
+     */
+    async deckPlayPress(deckId) {
         const playing = !this.Decks[deckId].play;
         await decksApi.setDeckPlay(deckId, playing);
         this.Decks[deckId].play = playing;
+    },
+
+    /**
+     * Play button mouseup — Pioneer CDJ "drag from CUE to PLAY" emulation.
+     * If CUE is still pressed (finger dragged from CUE to PLAY), start playback
+     * and release CUE simultaneously, just like pressing PLAY with another
+     * finger while holding CUE on a real CDJ.
+     * @param deckId
+     */
+    async deckPlayUp(deckId) {
+        const deck = this.Decks[deckId];
+        if (!deck) { return; }
+        if (deck.cuePressed) {
+            // const group = `[Channel${deckId}]`;
+            // await this.setParam(group, "play", 1); // not work!
+            await decksApi.setDeckPlay(deckId, true); // HARD PLAY, not work too!
+            deck.play = true;
+            deck.cuePressed = false;
+        }
+        // If cuePressed is false, this was a normal click — mousedown already
+        // toggled play, so do nothing on mouseup.
     },
 
     async deckStop(deckId) {
@@ -388,8 +476,73 @@ export default () => ({
         this.Decks[deckId].play = false;
     },
 
-    async deckCue(deckId) {
-        await decksApi.deckCue(deckId);
+    /**
+     * CUE press — Pioneer CDJ style: preview from current position (cue_default),
+     * or jump to cue point if near end of track (cue_goto).
+     * @param deckId
+     */
+    async deckCuePress(deckId) {
+        const deck = this.Decks[deckId];
+        if (!deck) { return; }
+        deck.cuePressed = true;
+        const group = `[Channel${deckId}]`;
+        if (deck.pos > 0.97) {
+            await this.setParam(group, "cue_goto", 1);
+        } else {
+            await this.setParam(group, "cue_default", 1);
+        }
+    },
+
+    /**
+     * CUE release — sends the corresponding 0 to release the cue button.
+     * @param deckId
+     */
+    async deckCueRelease(deckId) {
+        const deck = this.Decks[deckId];
+        if (!deck || !deck.cuePressed) { return; }
+        deck.cuePressed = false;
+        const group = `[Channel${deckId}]`;
+        if (deck.pos > 0.97) {
+            await this.setParam(group, "cue_goto", 0);
+        } else {
+            await this.setParam(group, "cue_default", 0);
+        }
+    },
+
+    /**
+     * SYNC press — Pioneer CDJ style with tap/hold logic.
+     * If not sync leader: enable sync, record timestamp.
+     * If already sync leader: disable sync, clear timestamp.
+     * @param deckId
+     */
+    async deckSyncPress(deckId) {
+        const deck = this.Decks[deckId];
+        if (!deck) { return; }
+        const group = `[Channel${deckId}]`;
+        if (!deck.syncLeader) {
+            await this.setParam(group, "sync_enabled", 1);
+            deck.syncLastTimestamp = Date.now();
+        } else {
+            await this.setParam(group, "sync_enabled", 0);
+            deck.syncLastTimestamp = 0;
+        }
+    },
+
+    /**
+     * SYNC release — Pioneer CDJ style:
+     * Short tap (< 250ms): disable sync (momentary).
+     * Long press (>= 250ms): keep sync leader active.
+     * @param deckId
+     */
+    async deckSyncRelease(deckId) {
+        const deck = this.Decks[deckId];
+        if (!deck) { return; }
+        if (deck.syncLastTimestamp === 0) { return; }
+        const group = `[Channel${deckId}]`;
+        if (Date.now() - deck.syncLastTimestamp < 250) {
+            await this.setParam(group, "sync_enabled", 0);
+        }
+        // else: long press — keep sync leader active, do nothing
     },
 
     async loadDeck(trackId, deck, play) {

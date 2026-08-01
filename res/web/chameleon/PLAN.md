@@ -104,9 +104,9 @@ ControlObject / SQLite / PlaylistDAO
 
 | # | Feature | Priority | Dependencies |
 | --- | --------- | ---------- | -------------- |
-| 1 | **Knob initialization from backend** | **Medium** | `getParameter` for each KNOB_PARAMS in `loadInitialState` |
-| 2 | **Pitch / Key control** (pitch slider, keylock, BPM display) | **Medium** | ControlObject: `rate`, `pitch`, `keylock`, `file_bpm` |
-| 3 | **CUE and SYNC buttons** | **Medium** | ControlObject: `cue_default`, `sync_enabled` |
+| ~~1~~ | ~~**Knob initialization from backend**~~ | ~~**Medium**~~ | ✅ Done — `getMixerParameters()` batch call polls all 6 knobs × visible decks every 2s via `getParameters` |
+| 2 | **Pitch / Key control** (pitch slider, keylock, BPM display) | **Medium** | ControlObject: `rate`, `pitch`, `keylock`, `file_bpm` — `rate` and `pitch` already in `deckExtraParams` |
+| ~~3~~ | ~~**CUE and SYNC buttons**~~ | ~~**Medium**~~ | ✅ Done — Pioneer CDJ style: CUE press/release (`cue_default`/`cue_goto`), SYNC tap/hold (`sync_enabled`/`sync_leader`), PLAY on mousedown |
 | 4 | **Offline overlay** (Mixxx not responding or connection lost) | **Medium** | Fetch timeout detection, UI overlay component |
 | 5 | **Add to AutoDJ with modal** (next track or in two? if next, pause AutoDJ, add, re-enable) | **Medium** | Modal component, AutoDJ state management |
 | 6 | **Hot cue** (save and recall) | **Low** | `HotCue` class already defined but unused |
@@ -219,9 +219,9 @@ src/
 
 ### Phase 3 — New Features (Medium Priority)
 
-- [ ] **Knob initialization from backend**: after loading initial state, call `getParam` for each KNOB_PARAMS of visible decks and update Channel models.
-- [ ] **Pitch/Key panel**: pitch slider -1..+1, keylock toggle, BPM/key display.
-- [ ] **CUE and SYNC buttons**: add cue and sync controls to deck transport.
+- [x] **Knob initialization from backend**: `getMixerParameters()` batch call polls all 6 knobs × visible decks every 2s (configurable) via `getParameters` endpoint. Values converted from engine range to UI 0..100 via `engineToUI()`.
+- [ ] **Pitch/Key panel**: pitch slider -1..+1, keylock toggle, BPM/key display. `rate` and `pitch` already polled via `deckExtraParams`.
+- [x] **CUE and SYNC buttons**: Pioneer CDJ style transport — CUE press/release with `cue_default`/`cue_goto`, SYNC tap/hold with `sync_enabled`/`sync_leader` (250ms threshold), PLAY toggle on mousedown. Mouse + touch handlers with `@contextmenu.prevent`. SYNC visual feedback via `btn-info` when active.
 - [ ] **Offline overlay**: detect connection loss (fetch timeout / network error), show overlay with "Mixxx not responding or connection closed" message.
 - [ ] **Add to AutoDJ with modal**: when adding a track to AutoDJ, show a modal asking "Play next or in two tracks?" If "next", temporarily disable AutoDJ, add track at top, re-enable AutoDJ.
 - [ ] **Connection indicator**: online/offline badge with automatic retry on fetch failure.

@@ -8,8 +8,11 @@
     Mixer: { Channels: { [id]: Channel } }
     knob({name, value, size}): Alpine component data
     knobChange(knobName, deckId, value): function
-    deckCue(deckId): function
-    toggleDeckPlay(deckId): function
+    deckCuePress(deckId): function
+    deckCueRelease(deckId): function
+    deckPlayPress(deckId): function
+    deckSyncPress(deckId): function
+    deckSyncRelease(deckId): function
 -->
 <template id="deck-channel">
   <div
@@ -28,16 +31,27 @@
         <div class="flex flex-wrap gap-1 justify-center items-center">
           <!-- CUE -->
           <button
-            class="text-white bg-orange-700 btn btn-sm btn-square"
-            @click="deckCue(deck.id)"
+            class="text-white bg-orange-700 btn btn-sm btn-square select-none active:scale-95"
+            @mousedown="deckCuePress(deck.id)"
+            @mouseup="deckCueRelease(deck.id)"
+            @touchstart.prevent="deckCuePress(deck.id)"
+            @touchend.prevent="deckCueRelease(deck.id)"
+            @touchcancel="deckCueRelease(deck.id)"
+            @contextmenu.prevent=""
           >
             <span class="text-xs">CUE</span>
           </button>
           <!-- PLAY / PAUSE toggle -->
           <button
-            class="btn btn-sm btn-square"
+            class="btn btn-sm btn-square select-none active:scale-95"
             :class="Decks[deck.id]?.play ? 'btn-warning' : 'btn-success'"
-            @click="toggleDeckPlay(deck.id)"
+            data-play-button
+            :data-deck-id="deck.id"
+            @mousedown="deckPlayPress(deck.id)"
+            @mouseup="deckPlayUp(deck.id)"
+            @touchstart.prevent="deckPlayPress(deck.id)"
+            @touchend.prevent="deckPlayUp(deck.id)"
+            @contextmenu.prevent=""
           >
             <span
               class="text-base"
@@ -45,7 +59,17 @@
             ></span>
           </button>
           <!-- SYNC -->
-          <button class="btn btn-sm btn-square btn-neutral">
+          <button
+            class="btn btn-sm btn-square select-none active:scale-95"
+            :class="Decks[deck.id]?.sync ? 'btn-info' : 'btn-neutral'"
+            @mousedown="deckSyncPress(deck.id)"
+            @mouseup="deckSyncRelease(deck.id)"
+            @mouseleave="deckSyncRelease(deck.id)"
+            @touchstart.prevent="deckSyncPress(deck.id)"
+            @touchend.prevent="deckSyncRelease(deck.id)"
+            @touchcancel="deckSyncRelease(deck.id)"
+            @contextmenu.prevent=""
+          >
             <span class="text-xs">SYNC</span>
           </button>
         </div>

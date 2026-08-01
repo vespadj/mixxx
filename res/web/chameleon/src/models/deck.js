@@ -28,5 +28,14 @@ export class Deck {
         this.hotCue = new Array(32); // sparse array of HotCue instances
         /** Cycles: 'elapsed' → 'remaining' → 'both' → 'elapsed'. Persisted via settings.decks. */
         this.timeDisplayMode = "elapsed";
+        // Sync state (Pioneer CDJ style)
+        this.sync = false;
+        this.syncLeader = false;
+        this.syncLastTimestamp = 0; // ms timestamp for sync tap/hold timing
+        // Cue state
+        this.cuePressed = false; // tracks physical press to avoid duplicate releases
+        // Extra params (populated dynamically via getDecksStatuses extra)
+        this.rate = 0;
+        this.pitch = 0;
     }
 }

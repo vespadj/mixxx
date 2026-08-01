@@ -9,8 +9,9 @@
     selectedDeck: number
     onDeckSeekInput(value): function
     onDeckSeekCommit(value): function
-    toggleDeckPlay(deckId): function
-    cycleTimeDisplay(deckId): function
+     deckPlayPress(deckId): function
+     deckPlayUp(deckId): function
+     cycleTimeDisplay(deckId): function
     formatDeckTime(deckId): function
     formatTime(seconds): function
 -->
@@ -29,9 +30,15 @@
             <div class="text-xs opacity-60" x-text="Decks[d.id].bpm ? Decks[d.id].bpm.toFixed(1) + ' BPM' : '–'"></div>
           </div>
           <button
-            class="btn btn-sm btn-square"
+            class="btn btn-sm btn-square select-none active:scale-95"
             :class="Decks[d.id].play ? 'btn-warning' : 'btn-success'"
-            @click="toggleDeckPlay(d.id)"
+            data-play-button
+            :data-deck-id="d.id"
+            @mousedown="deckPlayPress(d.id)"
+            @mouseup="deckPlayUp(d.id)"
+            @touchstart.prevent="deckPlayPress(d.id)"
+            @touchend.prevent="deckPlayUp(d.id)"
+            @contextmenu.prevent=""
           >
             <span
               class="text-base"

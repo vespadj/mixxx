@@ -72,13 +72,36 @@ export default {
     },
 
     /**
-     * Play/Pause toggle
+     * Play/Pause toggle — triggered on press (mousedown/touchstart), Pioneer CDJ style.
      * @param deckId
      */
-    async toggleDeckPlay(deckId) {
+    async deckPlayPress(deckId) {
         const playing = !this.Decks[deckId].play;
         await decksApi.setDeckPlay(deckId, playing);
         this.Decks[deckId].play = playing;
+    },
+
+    /**
+     * Play button mouseup — Pioneer CDJ "drag from CUE to PLAY" emulation.
+     * If CUE is still pressed (finger dragged from CUE to PLAY), start playback
+     * and release CUE simultaneously, just like pressing PLAY with another
+     * finger while holding CUE on a real CDJ.
+     * @param deckId
+     */
+    async deckPlayUp(deckId) {
+        const deck = this.Decks[deckId];
+        if (!deck) { return; }
+        if (deck.cuePressed) {
+            const group = `[Channel${deckId}]`;
+            // Setting play=1 automatically resets cue_default,
+            // so no explicit cue_default=0 is needed here.
+            await this.setParam(group, "play", 1);
+            alert('component deck');
+            deck.play = true;
+            deck.cuePressed = false;
+        }
+        // If cuePressed is false, this was a normal click — mousedown already
+        // toggled play, so do nothing on mouseup.
     },
 
     async deckStop(deckId) {
@@ -86,8 +109,73 @@ export default {
         this.Decks[deckId].play = false;
     },
 
-    async deckCue(deckId) {
-        await decksApi.deckCue(deckId);
+    /**
+     * CUE press — Pioneer CDJ style: preview from current position (cue_default),
+     * or jump to cue point if near end of track (cue_goto).
+     * @param deckId
+     */
+    async deckCuePress(deckId) {
+        const deck = this.Decks[deckId];
+        if (!deck) { return; }
+        deck.cuePressed = true;
+        const group = `[Channel${deckId}]`;
+        if (deck.pos > 0.97) {
+            await this.setParam(group, "cue_goto", 1);
+        } else {
+            await this.setParam(group, "cue_default", 1);
+        }
+    },
+
+    /**
+     * CUE release — sends the corresponding 0 to release the cue button.
+     * @param deckId
+     */
+    async deckCueRelease(deckId) {
+        const deck = this.Decks[deckId];
+        if (!deck || !deck.cuePressed) { return; }
+        deck.cuePressed = false;
+        const group = `[Channel${deckId}]`;
+        if (deck.pos > 0.97) {
+            await this.setParam(group, "cue_goto", 0);
+        } else {
+            await this.setParam(group, "cue_default", 0);
+        }
+    },
+
+    /**
+     * SYNC press — Pioneer CDJ style with tap/hold logic.
+     * If not sync leader: enable sync, record timestamp.
+     * If already sync leader: disable sync, clear timestamp.
+     * @param deckId
+     */
+    async deckSyncPress(deckId) {
+        const deck = this.Decks[deckId];
+        if (!deck) { return; }
+        const group = `[Channel${deckId}]`;
+        if (!deck.syncLeader) {
+            await this.setParam(group, "sync_enabled", 1);
+            deck.syncLastTimestamp = Date.now();
+        } else {
+            await this.setParam(group, "sync_enabled", 0);
+            deck.syncLastTimestamp = 0;
+        }
+    },
+
+    /**
+     * SYNC release — Pioneer CDJ style:
+     * Short tap (< 250ms): disable sync (momentary).
+     * Long press (>= 250ms): keep sync leader active.
+     * @param deckId
+     */
+    async deckSyncRelease(deckId) {
+        const deck = this.Decks[deckId];
+        if (!deck) { return; }
+        if (deck.syncLastTimestamp === 0) { return; }
+        const group = `[Channel${deckId}]`;
+        if (Date.now() - deck.syncLastTimestamp < 250) {
+            await this.setParam(group, "sync_enabled", 0);
+        }
+        // else: long press — keep sync leader active, do nothing
     },
 
     async loadDeck(trackId, deck, play) {

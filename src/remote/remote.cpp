@@ -8,6 +8,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QSet>
 #include <QSqlResult>
 #include <QTcpServer>
 #include <memory>
@@ -331,7 +332,33 @@ namespace mixxx {
                     }
 
                     if (!cur["getDecksStatuses"].isNull()) {
-                        QJsonArray jdecks = cur["getDecksStatuses"].toArray();
+                        // Support both old format (array of deck ids) and
+                        // new format ({decks: [...], extra: ["param1", ...]}).
+                        // Extra params are read via ControlObject::get and
+                        // allow the frontend to request new values without
+                        // recompiling the backend.
+                        QJsonArray jdecks;
+                        QJsonArray jextra;
+                        if (cur["getDecksStatuses"].isArray()) {
+                            jdecks = cur["getDecksStatuses"].toArray();
+                        } else {
+                            QJsonObject jobj = cur["getDecksStatuses"].toObject();
+                            jdecks = jobj["decks"].toArray();
+                            jextra = jobj["extra"].toArray();
+                        }
+
+                        // Base params always returned — skip if also in extra
+                        static const QSet<QString> baseParams = {
+                                QStringLiteral("deck"),
+                                QStringLiteral("playing"),
+                                QStringLiteral("position"),
+                                QStringLiteral("duration"),
+                                QStringLiteral("elapsed"),
+                                QStringLiteral("artist"),
+                                QStringLiteral("title"),
+                                QStringLiteral("bpm"),
+                                QStringLiteral("key")};
+
                         for (const QJsonValue& v : jdecks) {
                             int deck = v.toInt();
                             if (deck <= 0) {
@@ -366,6 +393,14 @@ namespace mixxx {
                             deckobj.insert("key",
                                     pTrack ? KeyUtils::keyToString(pTrack->getKey())
                                            : QString());
+                            // Add extra parameters requested by the frontend
+                            for (const QJsonValue& e : jextra) {
+                                QString paramKey = e.toString();
+                                if (!baseParams.contains(paramKey)) {
+                                    deckobj.insert(paramKey,
+                                            ControlObject::get(ConfigKey(group, paramKey)));
+                                }
+                            }
                             resproot.push_back(deckobj);
                         }
                     }
